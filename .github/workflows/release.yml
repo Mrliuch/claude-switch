@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25'
+          cache: true
+
+      - name: Build all platforms
+        env:
+          GOPROXY: https://goproxy.cn,direct
+          GONOSUMDB: "*"
+        run: |
+          BINARY=claude-switch
+          mkdir -p dist
+
+          build() {
+            GOOS=$1 GOARCH=$2 EXT=${3:-}
+            NAME="${BINARY}-${GOOS}-${GOARCH}${EXT}"
+            printf "  %-40s" "${NAME}"
+            CGO_ENABLED=0 GOOS=${GOOS} GOARCH=${GOARCH} \
+              go build -ldflags="-s -w" -o "dist/${NAME}" .
+            echo "✓"
+          }
+
+          build darwin  amd64
+          build darwin  arm64
+          build linux   amd64
+          build linux   arm64
+          build windows amd64 .exe
+
+          ls -lh dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          body: |
+            ## 各平台安装
+
+            ### macOS (Intel)
+            ```bash
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/claude-switch-darwin-amd64 -o /usr/local/bin/claude-switch && chmod +x /usr/local/bin/claude-switch
+            ```
+
+            ### macOS (Apple Silicon)
+            ```bash
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/claude-switch-darwin-arm64 -o /usr/local/bin/claude-switch && chmod +x /usr/local/bin/claude-switch
+            ```
+
+            ### Linux (x64)
+            ```bash
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/claude-switch-linux-amd64 -o /usr/local/bin/claude-switch && chmod +x /usr/local/bin/claude-switch
+            ```
+
+            ### Linux (ARM64)
+            ```bash
+            curl -L https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/claude-switch-linux-arm64 -o /usr/local/bin/claude-switch && chmod +x /usr/local/bin/claude-switch
+            ```
+
+            ### Windows (x64)
+            下载 `claude-switch-windows-amd64.exe` 放入 PATH 目录即可。
