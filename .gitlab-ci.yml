@@ -3,11 +3,13 @@ stages:
 
 variables:
   BINARY: claude-switch
-  GO_VERSION: "1.25"
+  # 如果 Runner 无法访问 Docker Hub，改为本地镜像地址
+  # 例如：GO_IMAGE: "registry.cn-hangzhou.aliyuncs.com/library/golang:1.25-alpine"
+  GO_IMAGE: "golang:1.25-alpine"
 
 release:
   stage: release
-  image: golang:${GO_VERSION}-alpine
+  image: $GO_IMAGE
   rules:
     - if: $CI_COMMIT_TAG =~ /^v.*/
   before_script:
