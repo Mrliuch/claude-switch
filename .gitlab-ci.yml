@@ -1,0 +1,98 @@
+stages:
+  - release
+
+variables:
+  BINARY: claude-switch
+  GO_VERSION: "1.25"
+
+release:
+  stage: release
+  image: golang:${GO_VERSION}-alpine
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v.*/
+  before_script:
+    - apk add --no-cache curl python3
+  script:
+    # ── 交叉编译 5 个平台 ──────────────────────────────────────
+    - |
+      mkdir -p dist
+
+      build() {
+        local goos=$1 goarch=$2 ext=${3:-}
+        local name="${BINARY}-${goos}-${goarch}${ext}"
+        printf "  %-40s" "${name}"
+        CGO_ENABLED=0 GOOS=${goos} GOARCH=${goarch} \
+          go build -ldflags="-s -w" -o "dist/${name}" .
+        echo "✓"
+      }
+
+      echo "==> 编译 ${CI_COMMIT_TAG}"
+      build darwin  amd64
+      build darwin  arm64
+      build linux   amd64
+      build linux   arm64
+      build windows amd64 .exe
+
+    # ── 上传到 Package Registry ────────────────────────────────
+    - |
+      echo "==> 上传到 Package Registry"
+      for file in dist/*; do
+        name=$(basename "${file}")
+        printf "  %-40s" "${name}"
+        curl -sf \
+          --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+          --upload-file "${file}" \
+          "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${BINARY}/${CI_COMMIT_TAG}/${name}"
+        echo "✓"
+      done
+
+    # ── 创建 GitLab Release ────────────────────────────────────
+    - |
+      echo "==> 创建 Release ${CI_COMMIT_TAG}"
+      python3 - <<'PYEOF'
+      import json, urllib.request, urllib.error, os
+
+      token   = os.environ["CI_JOB_TOKEN"]
+      api     = f"{os.environ['CI_API_V4_URL']}/projects/{os.environ['CI_PROJECT_ID']}/releases"
+      binary  = os.environ["BINARY"]
+      version = os.environ["CI_COMMIT_TAG"]
+      base    = f"{os.environ['CI_SERVER_URL']}/{os.environ['CI_PROJECT_PATH']}/-/packages/generic/{binary}/{version}"
+
+      platforms = [
+          ("darwin",  "amd64", ""),
+          ("darwin",  "arm64", ""),
+          ("linux",   "amd64", ""),
+          ("linux",   "arm64", ""),
+          ("windows", "amd64", ".exe"),
+      ]
+
+      links = [
+          {"name": f"{binary}-{g}-{a}{e}", "url": f"{base}/{binary}-{g}-{a}{e}", "link_type": "package"}
+          for g, a, e in platforms
+      ]
+
+      desc = "## 各平台安装\n\n" + "\n\n".join(
+          f"### {g}/{a}\n```bash\ncurl -L \"{base}/{binary}-{g}-{a}{e}\" -o /usr/local/bin/{binary}\nchmod +x /usr/local/bin/{binary}\n```"
+          for g, a, e in platforms
+      )
+
+      payload = {"name": version, "tag_name": version, "description": desc, "assets": {"links": links}}
+
+      req = urllib.request.Request(
+          api,
+          data=json.dumps(payload).encode(),
+          headers={"JOB-TOKEN": token, "Content-Type": "application/json"},
+          method="POST"
+      )
+      try:
+          with urllib.request.urlopen(req) as resp:
+              d = json.load(resp)
+              print(f"  Release 创建成功: {d['name']}")
+      except urllib.error.HTTPError as e:
+          d = json.load(e)
+          print(f"  注意: {d.get('message','')}")
+      PYEOF
+  artifacts:
+    paths:
+      - dist/
+    expire_in: 1 day
