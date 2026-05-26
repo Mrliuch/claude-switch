@@ -23,6 +23,8 @@ release:
         -v "$(pwd):/workspace" \
         -w /workspace \
         -e BINARY="${BINARY}" \
+        -e GOPROXY="https://goproxy.cn,direct" \
+        -e GONOSUMCHECK="*" \
         "${GO_IMAGE}" \
         sh -c '
           set -e
