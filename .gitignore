@@ -1,0 +1,10 @@
+# 编译产物
+claude-switch
+
+# macOS
+.DS_Store
+
+# Go
+*.test
+*.out
+vendor/
