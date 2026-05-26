@@ -3,34 +3,46 @@ stages:
 
 variables:
   BINARY: claude-switch
+  # Runner 已挂载宿主 Docker socket，使用 docker CLI 镜像即可，无需 DinD
+  GO_IMAGE: golang:1.25-alpine
 
 release:
   stage: release
-  image: golang:1.25-alpine
+  image: docker:24-cli
   rules:
     - if: $CI_COMMIT_TAG =~ /^v.*/
   before_script:
     - apk add --no-cache curl python3
   script:
-    # ── 交叉编译 5 个平台 ──────────────────────────────────────────
+    # ── 在 Go 容器内交叉编译 5 个平台 ─────────────────────────────
     - |
       echo "==> 编译 ${CI_COMMIT_TAG}"
       mkdir -p dist
 
-      build() {
-        goos=$1; goarch=$2; ext=${3:-}
-        name="${BINARY}-${goos}-${goarch}${ext}"
-        printf "  %-40s" "${name}"
-        CGO_ENABLED=0 GOOS=${goos} GOARCH=${goarch} \
-          go build -ldflags="-s -w" -o "dist/${name}" .
-        echo "✓"
-      }
+      docker run --rm \
+        -v "$(pwd):/workspace" \
+        -w /workspace \
+        -e BINARY="${BINARY}" \
+        "${GO_IMAGE}" \
+        sh -c '
+          set -e
+          mkdir -p dist
 
-      build darwin  amd64
-      build darwin  arm64
-      build linux   amd64
-      build linux   arm64
-      build windows amd64 .exe
+          build() {
+            goos=$1; goarch=$2; ext=${3:-}
+            name="${BINARY}-${goos}-${goarch}${ext}"
+            printf "  %-40s" "${name}"
+            CGO_ENABLED=0 GOOS=${goos} GOARCH=${goarch} \
+              go build -ldflags="-s -w" -o "dist/${name}" .
+            echo "done"
+          }
+
+          build darwin  amd64
+          build darwin  arm64
+          build linux   amd64
+          build linux   arm64
+          build windows amd64 .exe
+        '
 
     # ── 上传到 Package Registry ────────────────────────────────────
     - |
