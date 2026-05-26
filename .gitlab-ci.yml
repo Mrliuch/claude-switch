@@ -3,50 +3,34 @@ stages:
 
 variables:
   BINARY: claude-switch
-  DOCKER_BUILDKIT: "1"
-  # Harbor 中的 Go 镜像地址，在 GitLab → Settings → CI/CD → Variables 中设置：
-  #   HARBOR_REGISTRY   : harbor.example.com
-  #   HARBOR_PROJECT    : library
-  #   HARBOR_USERNAME   : robot$ci
-  #   HARBOR_PASSWORD   : <robot-token>
-  GO_IMAGE: "$HARBOR_REGISTRY/$HARBOR_PROJECT/golang:1.25-alpine"
 
 release:
   stage: release
-  # Runner 已挂载宿主 Docker socket，使用 docker CLI 镜像即可，无需 DinD
-  image: docker:24-cli
+  image: golang:1.25-alpine
   rules:
     - if: $CI_COMMIT_TAG =~ /^v.*/
   before_script:
-    - docker login -u "$HARBOR_USERNAME" -p "$HARBOR_PASSWORD" "$HARBOR_REGISTRY"
     - apk add --no-cache curl python3
   script:
-    # ── 交叉编译 5 个平台（在 Harbor 的 Go 镜像容器内执行）────────
+    # ── 交叉编译 5 个平台 ──────────────────────────────────────────
     - |
       echo "==> 编译 ${CI_COMMIT_TAG}"
-      docker run --rm \
-        -v "$(pwd):/app" \
-        -w /app \
-        "$GO_IMAGE" \
-        sh -c '
-          set -e
-          mkdir -p dist
+      mkdir -p dist
 
-          build() {
-            goos=$1; goarch=$2; ext=${3:-}
-            name="'"${BINARY}"'-${goos}-${goarch}${ext}"
-            printf "  %-40s" "${name}"
-            CGO_ENABLED=0 GOOS=${goos} GOARCH=${goarch} \
-              go build -ldflags="-s -w" -o "dist/${name}" .
-            echo "✓"
-          }
+      build() {
+        goos=$1; goarch=$2; ext=${3:-}
+        name="${BINARY}-${goos}-${goarch}${ext}"
+        printf "  %-40s" "${name}"
+        CGO_ENABLED=0 GOOS=${goos} GOARCH=${goarch} \
+          go build -ldflags="-s -w" -o "dist/${name}" .
+        echo "✓"
+      }
 
-          build darwin  amd64
-          build darwin  arm64
-          build linux   amd64
-          build linux   arm64
-          build windows amd64 .exe
-        '
+      build darwin  amd64
+      build darwin  arm64
+      build linux   amd64
+      build linux   arm64
+      build windows amd64 .exe
 
     # ── 上传到 Package Registry ────────────────────────────────────
     - |
