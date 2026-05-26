@@ -77,7 +77,7 @@ python3 - <<PYEOF
 import json, urllib.request, urllib.error
 
 gitlab   = "${GITLAB}"
-base_url = "${GITLAB}/${PROJECT_PATH}/-/packages/generic/${BINARY}/${VERSION}"
+base_url = "${GITLAB}/api/v4/projects/${PROJECT_ID}/packages/generic/${BINARY}/${VERSION}"
 binary   = "${BINARY}"
 version  = "${VERSION}"
 token    = "${GITLAB_TOKEN}"
