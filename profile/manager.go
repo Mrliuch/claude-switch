@@ -10,6 +10,7 @@ import (
 
 const (
 	nameKey         = "_name"
+	argsKey         = "_args"
 	profilesDirName = ".claude/profiles"
 	settingsName    = ".claude/settings.json"
 	backupName      = ".claude/settings.json.bak"
@@ -21,7 +22,10 @@ const (
 type Profile struct {
 	Name     string
 	Filename string
-	Data     map[string]interface{}
+	// Args 是 profile 在启动 claude 时默认追加的参数（来自 _args 字段）。
+	// 例：["--dangerously-skip-permissions"] 会让 -s 启动时自动带 YOLO。
+	Args []string
+	Data map[string]interface{}
 }
 
 func ProfilesPath() string {
@@ -71,6 +75,7 @@ func LoadProfiles() ([]Profile, error) {
 		profiles = append(profiles, Profile{
 			Name:     displayName,
 			Filename: filename,
+			Args:     parseArgs(raw[argsKey]),
 			Data:     raw,
 		})
 	}
@@ -89,15 +94,36 @@ func GetCurrentProfile() string {
 	return strings.TrimSpace(string(data))
 }
 
-// cleanProfileData 返回剔除 _name 字段后的新 map（不修改原数据）。
+// cleanProfileData 返回剔除元数据字段（_name / _args）后的新 map（不修改原数据）。
+// 这些字段是 claude-switch 自用的元数据，不应该传给 claude。
 func cleanProfileData(data map[string]interface{}) map[string]interface{} {
 	clean := make(map[string]interface{}, len(data))
 	for k, v := range data {
-		if k != nameKey {
-			clean[k] = v
+		if k == nameKey || k == argsKey {
+			continue
 		}
+		clean[k] = v
 	}
 	return clean
+}
+
+// parseArgs 把 JSON 里的 _args 字段（可能是 nil / 任意类型 / 字符串数组）
+// 转成 []string，类型不对时返回 nil（即没有默认参数）。
+func parseArgs(v interface{}) []string {
+	raw, ok := v.([]interface{})
+	if !ok {
+		return nil
+	}
+	args := make([]string, 0, len(raw))
+	for _, item := range raw {
+		if s, ok := item.(string); ok && s != "" {
+			args = append(args, s)
+		}
+	}
+	if len(args) == 0 {
+		return nil
+	}
+	return args
 }
 
 // MarshalCleanProfile 把 profile 数据剔除 _name 后序列化为缩进 JSON。
