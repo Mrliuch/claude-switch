@@ -69,12 +69,12 @@ claude-switch list
 claude-switch init
 ```
 
-### ⚠️ v0.1 → v0.2 破坏性变更
+### ⚠️ v1.3.7 行为变更
 
-| v0.1 命令 | v0.2 等效命令 |
+| 老命令 | v1.3.7 等效命令 |
 |---|---|
 | `claude-switch`（仅切换 settings.json） | `claude-switch switch` |
-| `claude-switch`（v0.2 默认行为） | 交互选择后**直接启动 claude**，不改全局 settings.json |
+| `claude-switch`（新默认行为） | 交互选择后**直接启动 claude**，不改全局 settings.json |
 
 如果你的脚本依赖老行为，把 `claude-switch` 改为 `claude-switch switch` 即可。
 

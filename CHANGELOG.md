@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.2.0] - 2026-06-12
+## [1.3.7] - 2026-06-12
 
 ### 新功能
 
@@ -18,17 +18,14 @@
 - 🔒 临时 settings 目录权限 `0700`，文件权限 `0600`，避免 API Key 泄漏。
 - 🔒 `.gitignore` 默认忽略 `.claude/profiles/.runtime/`。
 
-### 破坏性变更
+### 行为变更
 
-- 💥 `claude-switch`（无参数）行为从「**仅切换 settings.json**」改为「**交互选择后启动 claude**」。
+- ⚠️ `claude-switch`（无参数）行为从「**仅切换 settings.json**」改为「**交互选择后启动 claude**」。
   老行为迁移到 `claude-switch switch` 子命令；`list` / `init` 子命令保持不变。
+  如果你的脚本依赖老行为，把 `claude-switch` 改为 `claude-switch switch` 即可。
 
 ### 内部
 
 - ♻️ 抽取 `MarshalCleanProfile` / `FindProfile` 公共函数。
 - 📦 新增 `launcher` 包负责拉起 claude 进程。
 - 📦 新增 `profile/runtime.go` 负责生成/清理临时 settings。
-
-## [0.1.0]
-
-- 初始版本：交互式 TUI 切换 `~/.claude/settings.json`。
