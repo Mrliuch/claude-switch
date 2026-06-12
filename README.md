@@ -35,13 +35,50 @@ claude-switch -s provider-a -- --dangerously-skip-permissions
 claude-switch -s provider-a -- --model opus "帮我重构这段代码"
 claude-switch -s provider-a -- -c                             # claude 的 -c (continue)
 
-# 不指定 profile：交互选择，选完直接启动 claude
+# 不指定 profile：双屏交互（选 profile → 勾选启动选项 → 启动）
 claude-switch
 
 # 自定义 claude 可执行文件路径
 claude-switch -s provider-a --claude-bin /opt/claude/bin/claude
 CLAUDE_BIN=/opt/claude/bin/claude claude-switch -s provider-a
 ```
+
+### 双屏交互流程（无参数运行）
+
+```
+第一屏：选 profile                第二屏：勾选启动选项
+┌──────────────────────┐          ┌─────────────────────────────────────┐
+│ > 闻歌-云计算-刘晨 ●  │          │ 启动选项 - 闻歌-云计算-刘晨          │
+│   Luken-NewAPI       │   Enter  │                                      │
+│   小马API            │  ──────> │ [✓] YOLO 模式（--dangerously-...）  │
+│   官方 OAuth         │          │ [ ] 续接上次会话（-c）              │
+└──────────────────────┘          │                                      │
+                                   │ 空格切换  Enter 启动  Esc 返回      │
+                                   └─────────────────────────────────────┘
+```
+
+- 第二屏的默认勾选状态从 profile 的 `_args` 字段推断（详见下文）
+- Esc 可从第二屏返回第一屏重选 profile
+
+### 在 profile 里写默认参数（_args）
+
+如果某个 profile 每次都要带 YOLO，可以在 profile JSON 里加 `_args` 字段：
+
+```json
+{
+  "_name": "闻歌-云计算-刘晨",
+  "_args": ["--dangerously-skip-permissions"],
+  "env": { "ANTHROPIC_BASE_URL": "...", "ANTHROPIC_API_KEY": "..." }
+}
+```
+
+- `claude-switch -s 闻歌` 会自动在启动 claude 时追加 `--dangerously-skip-permissions`
+- 命令行 `--` 之后的参数会**追加在 `_args` 之后**：
+  ```bash
+  claude-switch -s 闻歌 -- --model opus
+  # 实际执行：claude --settings xxx --dangerously-skip-permissions --model opus
+  ```
+- 交互模式下 `_args` 会作为「默认勾选状态」反映到选项面板，可临时取消
 
 可以同时打开多个终端窗口，每个用不同 profile，互不冲突：
 

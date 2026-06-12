@@ -55,8 +55,12 @@ var switchCmd = &cobra.Command{
 }
 
 // run 是默认行为：
-//   - 带 -s 参数：直接以指定 profile 启动 claude
-//   - 不带 -s：交互选择后启动 claude
+//   - 带 -s 参数：以指定 profile 启动 claude
+//     · 默认参数 = profile._args + 命令行 -- 后的参数
+//     · 不弹选项面板（一键直启）
+//   - 不带 -s：双屏交互
+//     · 第一屏：选 profile
+//     · 第二屏：勾选启动选项（默认勾选状态从 profile._args 推断）
 //
 // 不会修改全局 settings.json，也不会更新 .current。
 func run(cmd *cobra.Command, args []string) error {
@@ -64,15 +68,18 @@ func run(cmd *cobra.Command, args []string) error {
 		return bootstrapDefault()
 	}
 
-	var chosen *profile.Profile
-
 	if flagSetting != "" {
 		p, err := profile.FindProfile(flagSetting)
 		if err != nil {
 			return err
 		}
-		chosen = p
-	} else {
+		// 命令行直启：profile._args 在前，命令行透传参数在后。
+		merged := append(append([]string{}, p.Args...), args...)
+		return launchWithProfile(*p, merged)
+	}
+
+	// 交互模式：选 profile → 选项面板。Esc 可在选项面板返回再选 profile。
+	for {
 		profiles, err := profile.LoadProfiles()
 		if err != nil {
 			return err
@@ -86,10 +93,19 @@ func run(cmd *cobra.Command, args []string) error {
 			fmt.Println("已取消")
 			return nil
 		}
-		chosen = picked
-	}
 
-	return launchWithProfile(*chosen, args)
+		finalArgs, err := ui.RunOptions(*picked)
+		if err != nil {
+			if errors.Is(err, ui.ErrOptionsAborted) {
+				// 用户在选项面板取消 → 回到 profile 选择
+				continue
+			}
+			return err
+		}
+		// 交互模式不接受命令行 -- 透传（要透传请用 -s）；保留 args 以兼容。
+		merged := append(append([]string{}, finalArgs...), args...)
+		return launchWithProfile(*picked, merged)
+	}
 }
 
 // runSwitch 是 v0.1 的默认行为，迁移到 switch 子命令。

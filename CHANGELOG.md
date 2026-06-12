@@ -1,5 +1,24 @@
 # Changelog
 
+## [1.3.8] - 2026-06-12
+
+### 新功能
+
+- ✨ **`_args` 字段**：profile JSON 可写默认 args 数组（如 `"_args": ["--dangerously-skip-permissions"]`），
+  `-s` 启动时自动追加给 claude，命令行透传参数追加在其后。
+- ✨ **双屏交互流程**：无参数运行 `claude-switch` 时，选完 profile 会进入选项勾选面板：
+  - YOLO 模式（`--dangerously-skip-permissions`）
+  - 续接上次会话（`-c`）
+  - 默认勾选状态从 profile `_args` 推断
+  - Esc 可返回 profile 选择
+- ✨ 选项面板用 `charmbracelet/huh` 实现。
+
+### 内部
+
+- 📦 新增 `ui/options.go`。
+- 📦 `Profile` struct 新增 `Args []string` 字段。
+- 📦 `cleanProfileData` 同时剔除 `_name` 和 `_args`（不传给 claude）。
+
 ## [1.3.7] - 2026-06-12
 
 ### 新功能
