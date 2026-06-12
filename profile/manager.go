@@ -89,6 +89,26 @@ func GetCurrentProfile() string {
 	return strings.TrimSpace(string(data))
 }
 
+// cleanProfileData 返回剔除 _name 字段后的新 map（不修改原数据）。
+func cleanProfileData(data map[string]interface{}) map[string]interface{} {
+	clean := make(map[string]interface{}, len(data))
+	for k, v := range data {
+		if k != nameKey {
+			clean[k] = v
+		}
+	}
+	return clean
+}
+
+// MarshalCleanProfile 把 profile 数据剔除 _name 后序列化为缩进 JSON。
+func MarshalCleanProfile(p Profile) ([]byte, error) {
+	out, err := json.MarshalIndent(cleanProfileData(p.Data), "", "  ")
+	if err != nil {
+		return nil, fmt.Errorf("序列化失败: %w", err)
+	}
+	return out, nil
+}
+
 func SwitchProfile(p Profile) error {
 	settingsPath := SettingsPath()
 
@@ -99,17 +119,9 @@ func SwitchProfile(p Profile) error {
 		}
 	}
 
-	// 剔除 _name 字段后写入 settings.json
-	clean := make(map[string]interface{}, len(p.Data))
-	for k, v := range p.Data {
-		if k != nameKey {
-			clean[k] = v
-		}
-	}
-
-	out, err := json.MarshalIndent(clean, "", "  ")
+	out, err := MarshalCleanProfile(p)
 	if err != nil {
-		return fmt.Errorf("序列化失败: %w", err)
+		return err
 	}
 
 	if err := os.WriteFile(settingsPath, out, 0644); err != nil {
@@ -121,6 +133,20 @@ func SwitchProfile(p Profile) error {
 		[]byte(p.Filename),
 		0644,
 	)
+}
+
+// FindProfile 根据文件名（不含 .json 后缀）查找 profile。
+func FindProfile(filename string) (*Profile, error) {
+	profiles, err := LoadProfiles()
+	if err != nil {
+		return nil, err
+	}
+	for i := range profiles {
+		if profiles[i].Filename == filename {
+			return &profiles[i], nil
+		}
+	}
+	return nil, fmt.Errorf("未找到名为 %q 的 profile，请用 `claude-switch list` 查看可用配置", filename)
 }
 
 func IsProfilesDirEmpty() bool {
@@ -155,7 +181,7 @@ func InitDefaultProfile() error {
 
 	out, err := json.MarshalIndent(raw, "", "  ")
 	if err != nil {
-		return fmt.Errorf("序列化失败: %w", err)
+		return fmt.Errorf("序列化默认 profile 失败: %w", err)
 	}
 
 	profilePath := filepath.Join(ProfilesPath(), defaultFilename+".json")
