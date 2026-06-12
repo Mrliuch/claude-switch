@@ -9,3 +9,6 @@ claude-switch
 *.out
 vendor/
 dist/
+
+# 本地运行产生的临时 settings（含明文 API Key）
+.claude/profiles/.runtime/
